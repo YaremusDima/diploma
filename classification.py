@@ -27,11 +27,12 @@ from gensim.models import CoherenceModel
 script_dir=os.path.dirname(os.path.abspath(__file__))
 with open(f'{script_dir}/ru_stopwords.yaml', 'r') as f:
     ru_stopwords = yaml.safe_load(f)
+    ru_stopwords.append("_")
 
 parser = argparse.ArgumentParser(description='Args to make classification')
 parser.add_argument('age', type=int, help='age to classificate')
 parser.add_argument('gender', type=int, help='gender to classificate, 1-female, 2-male')
-parser.add_argument('data_dir', type=str, default='datasets', help='dir for datasets')
+parser.add_argument('data_dir', type=str, default='datasets_prepared', help='dir for datasets')
 # parser.add_argument('result_dir', type=str, help='dir for result', default='result')
 parser.add_argument('data_maxlen', type=int, help='max len for messages in dataset', default=500000)
 args = parser.parse_args()
@@ -70,14 +71,14 @@ def preprocess(stem, text):
     return tokens
 
 if __name__ == '__main__':
-    dataset_path = f'{script_dir}/{args.data_dir}/{args.age}_{args.gender}_0_150.csv'
-    dataset = pd.read_csv(dataset_path, delimiter='\t')
-
-    dataset_short = dataset if len(dataset) <= args.data_maxlen else dataset.sample(args.data_maxlen)
-    dataset_short.replace('þ<br />þ', '\n ', regex=True, inplace=True)
+    dataset_path = f'{script_dir}\{args.data_dir}\{args.age}_{args.gender}_0_150_train.csv'
+    dataset = pd.read_csv(dataset_path)
+    # print(dataset.head())
+    # dataset_short = dataset if len(dataset) <= args.data_maxlen else dataset.sample(args.data_maxlen)
+    # dataset_short.replace('þ<br />þ', '\n ', regex=True, inplace=True)
 
     stem = Mystem()
-    data = dataset_short['text'].tolist()
+    data = dataset['text'].tolist()
     preprocessed_fast_data = preprocess_fast(data, stem, 50000)
 
     # Create Dictionary
@@ -87,7 +88,7 @@ if __name__ == '__main__':
     # Term Document Frequency
     corpus = [id2word.doc2bow(text) for text in texts]
 
-    for num_topics in range(1, 6):
+    for num_topics in range(1, 7):
         # Build LDA model
         print(f'build {num_topics} topics model')
         lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
@@ -101,8 +102,13 @@ if __name__ == '__main__':
                                                 per_word_topics=True)
         for i in lda_model.print_topics():
             print(i)
-        with open(fr'{script_dir}\results\topics_{num_topics}_{args.data_maxlen}_{args.age}_{args.gender}.yaml', 'w') as file:
-            yaml.dump(dict(lda_model.print_topics()), file)
+        # with open(fr'{script_dir}\results\topics_{num_topics}_{args.data_maxlen}_{args.age}_{args.gender}.yaml', 'w') as file:
+        #     yaml.dump(dict(lda_model.print_topics()), file)
+
+        with open(fr'{script_dir}\results\topics_{num_topics}_{args.data_maxlen}_{args.age}_{args.gender}.txt', 'w', encoding='utf-8') as f:
+            for key in dict(lda_model.print_topics(num_words=15)):
+                f.write(str(key) + ' : ' + dict(lda_model.print_topics(num_words=15))[key] + '\n')
+
         if num_topics > 1:
             # Visualize the topics
             # pyLDAvis.enable_notebook()
